@@ -1,0 +1,1886 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+>
+
+<title>Parent Device - Live Audio</title>
+
+<style>
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+
+    margin: 0;
+
+    min-height: 100vh;
+
+    background:
+        radial-gradient(
+            circle at top,
+            #202938,
+            #0d1016 65%
+        );
+
+    color: #eeeeee;
+
+    font-family: Arial, sans-serif;
+
+    display: flex;
+
+    justify-content: center;
+
+    align-items: center;
+
+    padding: 20px;
+}
+
+.container {
+
+    width: 100%;
+
+    max-width: 500px;
+
+    background: #181d26;
+
+    border: 1px solid #303744;
+
+    border-radius: 20px;
+
+    padding: 30px;
+
+    box-shadow:
+        0 20px 60px
+        rgba(0,0,0,.4);
+}
+
+h1 {
+
+    margin: 0;
+
+    font-size: 30px;
+}
+
+.subtitle {
+
+    color: #9098a8;
+
+    margin-top: 8px;
+
+    line-height: 1.5;
+}
+
+label {
+
+    display: block;
+
+    margin-top: 25px;
+
+    margin-bottom: 8px;
+
+    color: #aeb6c5;
+}
+
+input {
+
+    width: 100%;
+
+    padding: 14px;
+
+    border-radius: 10px;
+
+    border: 1px solid #353c49;
+
+    background: #0e1218;
+
+    color: white;
+
+    font-size: 16px;
+
+    outline: none;
+}
+
+button {
+
+    width: 100%;
+
+    padding: 14px;
+
+    margin-top: 12px;
+
+    border-radius: 10px;
+
+    border: none;
+
+    cursor: pointer;
+
+    font-size: 15px;
+
+    font-weight: bold;
+}
+
+button:disabled {
+
+    opacity: .35;
+
+    cursor: not-allowed;
+}
+
+#connectBtn {
+
+    background: #4ad9c2;
+
+    color: #071310;
+}
+
+#listenBtn {
+
+    background: #4ad9c2;
+
+    color: #071310;
+}
+
+#stopListenBtn {
+
+    background: #ff5c5c;
+
+    color: white;
+}
+
+#disconnectBtn {
+
+    background: #292f3a;
+
+    color: white;
+}
+
+.status {
+
+    margin-top: 20px;
+
+    padding: 14px;
+
+    background: #0e1218;
+
+    border-radius: 10px;
+
+    color: #9ca5b5;
+
+    line-height: 1.5;
+}
+
+.status.live {
+
+    color: #4ad9c2;
+
+    border: 1px solid #255e55;
+}
+
+.dot {
+
+    display: inline-block;
+
+    width: 10px;
+
+    height: 10px;
+
+    background: #666;
+
+    border-radius: 50%;
+
+    margin-right: 8px;
+}
+
+.dot.live {
+
+    background: #4ad9c2;
+
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+
+    0% {
+        box-shadow:
+            0 0 0 0
+            rgba(74,217,194,.7);
+    }
+
+    70% {
+        box-shadow:
+            0 0 0 10px
+            rgba(74,217,194,0);
+    }
+
+    100% {
+        box-shadow:
+            0 0 0 0
+            rgba(74,217,194,0);
+    }
+}
+
+.audio-panel {
+
+    margin-top: 20px;
+
+    padding: 15px;
+
+    border-radius: 12px;
+
+    background: #10141b;
+
+    border: 1px solid #303744;
+}
+
+.audio-title {
+
+    color: #4ad9c2;
+
+    font-weight: bold;
+
+    margin-bottom: 12px;
+}
+
+audio {
+
+    width: 100%;
+}
+
+.connection {
+
+    margin-top: 15px;
+
+    padding: 12px;
+
+    border-radius: 10px;
+
+    background: #10141b;
+
+    font-size: 13px;
+
+    color: #8f99aa;
+}
+
+.info {
+
+    margin-top: 20px;
+
+    font-size: 13px;
+
+    color: #777f8f;
+
+    line-height: 1.6;
+}
+
+.volume-box {
+
+    margin-top: 15px;
+}
+
+.volume-box label {
+
+    margin: 0 0 8px 0;
+
+    font-size: 13px;
+}
+
+#volumeSlider {
+
+    width: 100%;
+}
+
+
+.recordings-panel {
+    margin-top: 20px;
+    padding: 15px;
+    border-radius: 12px;
+    background: #10141b;
+    border: 1px solid #303744;
+}
+
+.recordings-title {
+    color: #4ad9c2;
+    font-weight: bold;
+    margin-bottom: 12px;
+}
+
+.recordings-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 360px;
+    overflow-y: auto;
+}
+
+.recording-item {
+    background: #181d26;
+    border: 1px solid #303744;
+    border-radius: 10px;
+    padding: 12px;
+}
+
+.recording-meta {
+    color: #c7ceda;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.recording-item audio {
+    width: 100%;
+    margin-top: 8px;
+}
+
+.recording-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.recording-actions a,
+.refresh-recordings {
+    display: inline-block;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #292f3a;
+    color: #fff;
+    text-decoration: none;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.recording-actions a:hover,
+.refresh-recordings:hover {
+    background: #3a4352;
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+
+<div class="container">
+
+    <h1>
+        Parent Device
+    </h1>
+
+    <div class="subtitle">
+        Child live audio monitor
+    </div>
+
+
+    <label>
+        Child ID / Room ID
+    </label>
+
+    <input
+        id="roomId"
+        value="child001"
+        placeholder="Enter Child ID"
+    >
+
+
+    <button id="connectBtn">
+        Connect to Child
+    </button>
+
+
+    <button
+        id="listenBtn"
+        disabled
+    >
+        🔊 Start Listening
+    </button>
+
+
+    <button
+        id="stopListenBtn"
+        disabled
+    >
+        🔇 Stop Listening
+    </button>
+
+
+    <button
+        id="disconnectBtn"
+        disabled
+    >
+        Disconnect
+    </button>
+
+
+    <div
+        class="status"
+        id="status"
+    >
+        <span class="dot"></span>
+        Not connected
+    </div>
+
+
+    <div
+        class="connection"
+        id="connectionStatus"
+    >
+        Child: Not connected
+    </div>
+
+
+    <div
+        class="audio-panel"
+        id="audioPanel"
+        style="display:none"
+    >
+
+        <div class="audio-title">
+            🔴 LIVE CHILD AUDIO
+        </div>
+
+
+        <audio
+            id="remoteAudio"
+            autoplay
+            playsinline
+        ></audio>
+
+
+        <div class="volume-box">
+
+            <label>
+                Volume
+            </label>
+
+            <input
+                id="volumeSlider"
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value="1"
+            >
+
+        </div>
+
+    </div>
+
+
+    
+    <div class="recordings-panel">
+        <div class="recordings-title">🎙 Recording List</div>
+        <div id="recordingsList" class="recordings-list">
+            Connect to a child to load recordings.
+        </div>
+    </div>
+
+    <div class="info">
+
+        Live audio is available only after
+        the child explicitly starts sharing
+        the microphone.
+
+        <br><br>
+
+        The parent cannot activate the child's
+        microphone from this page.
+
+    </div>
+
+</div>
+
+
+
+<script src="/socket.io/socket.io.js"></script>
+
+
+<script>
+
+/*
+==================================================
+SOCKET
+==================================================
+*/
+
+const socket = io();
+
+
+/*
+==================================================
+UI
+==================================================
+*/
+
+const roomInput =
+    document.getElementById("roomId");
+
+const connectBtn =
+    document.getElementById("connectBtn");
+
+const listenBtn =
+    document.getElementById("listenBtn");
+
+const stopListenBtn =
+    document.getElementById("stopListenBtn");
+
+const disconnectBtn =
+    document.getElementById("disconnectBtn");
+
+const statusEl =
+    document.getElementById("status");
+
+const connectionStatus =
+    document.getElementById("connectionStatus");
+
+const audioPanel =
+    document.getElementById("audioPanel");
+
+const remoteAudio =
+    document.getElementById("remoteAudio");
+
+const volumeSlider =
+    document.getElementById("volumeSlider");
+
+
+/*
+==================================================
+STATE
+==================================================
+*/
+
+let roomId = null;
+
+let connected = false;
+
+let childConnected = false;
+
+let childLive = false;
+
+let peerConnection = null;
+
+let remoteStream = null;
+
+
+/*
+==================================================
+WEB AUDIO
+==================================================
+*/
+
+let audioContext = null;
+
+let audioSource = null;
+
+let gainNode = null;
+
+let audioStarted = false;
+
+
+/*
+==================================================
+ICE
+==================================================
+*/
+
+let pendingIceCandidates = [];
+
+
+/*
+==================================================
+STATUS
+==================================================
+*/
+
+function setStatus(message, live = false) {
+
+    statusEl.innerHTML =
+        `<span class="dot ${live ? "live" : ""}"></span>${message}`;
+
+    if (live) {
+
+        statusEl.classList.add("live");
+
+    } else {
+
+        statusEl.classList.remove("live");
+
+    }
+}
+
+
+/*
+==================================================
+CONNECT
+==================================================
+*/
+
+connectBtn.addEventListener(
+    "click",
+    () => {
+
+        roomId =
+            roomInput.value.trim();
+
+        if (!roomId) {
+
+            alert(
+                "Enter Child ID / Room ID"
+            );
+
+            return;
+        }
+
+
+        socket.emit(
+            "join-room",
+            {
+                roomId,
+                role: "parent"
+            }
+        );
+
+
+        connectBtn.disabled =
+            true;
+
+        roomInput.disabled =
+            true;
+
+        setStatus(
+            "Connecting..."
+        );
+
+    }
+);
+
+
+/*
+==================================================
+ROOM JOINED
+==================================================
+*/
+
+socket.on(
+    "room-joined",
+    () => {
+
+        connected = true;
+
+        disconnectBtn.disabled =
+            false;
+
+        setStatus(
+            "Connected. Waiting for child..."
+        );
+
+    }
+);
+
+
+/*
+==================================================
+CHILD ONLINE
+==================================================
+*/
+
+socket.on(
+    "child-online",
+    () => {
+
+        childConnected = true;
+
+        connectionStatus.textContent =
+            "Child: Connected";
+
+        setStatus(
+            "Child connected. Waiting for live audio..."
+        );
+
+    }
+);
+
+
+/*
+==================================================
+CHILD STARTED AUDIO
+==================================================
+*/
+
+socket.on(
+    "audio-started",
+    () => {
+
+        childLive = true;
+
+        childConnected = true;
+
+        connectionStatus.textContent =
+            "Child: LIVE AUDIO";
+
+        setStatus(
+            "Child started live audio. Connecting..."
+        );
+
+        listenBtn.disabled = false;
+
+    }
+);
+
+
+/*
+==================================================
+CREATE WEBRTC CONNECTION
+==================================================
+*/
+
+async function createPeerConnection() {
+
+    console.log(
+        "Creating parent WebRTC connection..."
+    );
+
+
+    if (peerConnection) {
+
+        peerConnection.close();
+
+    }
+
+
+    peerConnection =
+        new RTCPeerConnection({
+
+            iceServers: [
+
+                {
+                    urls:
+                        "stun:stun.l.google.com:19302"
+                }
+
+            ]
+
+        });
+
+
+    /*
+    ==============================================
+    RECEIVE REMOTE AUDIO
+    ==============================================
+    */
+
+    peerConnection.ontrack =
+        async (event) => {
+
+            console.log(
+                "Received WebRTC track:",
+                event.track.kind
+            );
+
+
+            if (
+                event.track.kind !==
+                "audio"
+            ) {
+
+                return;
+
+            }
+
+
+            console.log(
+                "Audio track enabled:",
+                event.track.enabled
+            );
+
+
+            console.log(
+                "Audio track readyState:",
+                event.track.readyState
+            );
+
+
+            /*
+            Get remote stream
+            */
+
+            if (
+                event.streams &&
+                event.streams.length > 0
+            ) {
+
+                remoteStream =
+                    event.streams[0];
+
+            } else {
+
+                remoteStream =
+                    new MediaStream();
+
+                remoteStream.addTrack(
+                    event.track
+                );
+
+            }
+
+
+            /*
+            Put stream into audio element
+            */
+
+            remoteAudio.srcObject =
+                remoteStream;
+
+
+            remoteAudio.volume =
+                Number(
+                    volumeSlider.value
+                );
+
+
+            audioPanel.style.display =
+                "block";
+
+
+            listenBtn.disabled =
+                false;
+
+
+            /*
+            Prepare Web Audio
+            */
+
+            await setupAudioContext();
+
+
+            setStatus(
+                "Audio received. Click Start Listening.",
+                true
+            );
+
+        };
+
+
+    /*
+    ==============================================
+    ICE
+    ==============================================
+    */
+
+    peerConnection.onicecandidate =
+        event => {
+
+            if (
+                !event.candidate
+            ) {
+
+                return;
+
+            }
+
+
+            console.log(
+                "Sending ICE candidate"
+            );
+
+
+            socket.emit(
+                "ice-candidate",
+                {
+                    roomId,
+                    candidate:
+                        event.candidate
+                }
+            );
+
+        };
+
+
+    /*
+    ==============================================
+    CONNECTION STATE
+    ==============================================
+    */
+
+    peerConnection.onconnectionstatechange =
+        () => {
+
+            if (!peerConnection) {
+
+                return;
+
+            }
+
+
+            console.log(
+                "Parent WebRTC state:",
+                peerConnection.connectionState
+            );
+
+
+            if (
+                peerConnection.connectionState ===
+                "connected"
+            ) {
+
+                setStatus(
+                    "WebRTC connected. Waiting for audio...",
+                    true
+                );
+
+            }
+
+
+            if (
+                peerConnection.connectionState ===
+                "disconnected"
+            ) {
+
+                setStatus(
+                    "Audio connection disconnected."
+                );
+
+            }
+
+
+            if (
+                peerConnection.connectionState ===
+                "failed"
+            ) {
+
+                setStatus(
+                    "WebRTC connection failed."
+                );
+
+            }
+
+        };
+
+
+    /*
+    ==============================================
+    ICE CONNECTION STATE
+    ==============================================
+    */
+
+    peerConnection.oniceconnectionstatechange =
+        () => {
+
+            console.log(
+                "ICE state:",
+                peerConnection.iceConnectionState
+            );
+
+        };
+
+}
+
+
+/*
+==================================================
+WEB AUDIO SETUP
+==================================================
+*/
+
+async function setupAudioContext() {
+
+    if (!remoteStream) {
+
+        console.log(
+            "No remote stream yet."
+        );
+
+        return;
+
+    }
+
+
+    /*
+    Create AudioContext once
+    */
+
+    if (!audioContext) {
+
+        audioContext =
+            new (
+                window.AudioContext ||
+                window.webkitAudioContext
+            )();
+
+        console.log(
+            "AudioContext created:",
+            audioContext.state
+        );
+
+    }
+
+
+    /*
+    Resume if browser suspended it
+    */
+
+    if (
+        audioContext.state ===
+        "suspended"
+    ) {
+
+        try {
+
+            await audioContext.resume();
+
+        } catch (error) {
+
+            console.error(
+                "AudioContext resume failed:",
+                error
+            );
+
+        }
+
+    }
+
+
+    /*
+    Don't create duplicate source
+    */
+
+    if (!audioSource) {
+
+        audioSource =
+            audioContext.createMediaStreamSource(
+                remoteStream
+            );
+
+
+        gainNode =
+            audioContext.createGain();
+
+
+        gainNode.gain.value =
+            Number(
+                volumeSlider.value
+            );
+
+
+        audioSource.connect(
+            gainNode
+        );
+
+
+        gainNode.connect(
+            audioContext.destination
+        );
+
+
+        console.log(
+            "Remote audio connected to speakers."
+        );
+
+    }
+
+}
+
+
+/*
+==================================================
+WEBRTC OFFER
+==================================================
+*/
+
+socket.on(
+    "webrtc-offer",
+    async ({ offer }) => {
+
+        try {
+
+            console.log(
+                "Received WebRTC offer."
+            );
+
+
+            await createPeerConnection();
+
+
+            /*
+            Set remote description
+            */
+
+            await peerConnection.setRemoteDescription(
+                new RTCSessionDescription(
+                    offer
+                )
+            );
+
+
+            /*
+            Add queued ICE
+            */
+
+            for (
+                const candidate
+                of pendingIceCandidates
+            ) {
+
+                try {
+
+                    await peerConnection.addIceCandidate(
+                        new RTCIceCandidate(
+                            candidate
+                        )
+                    );
+
+                } catch (error) {
+
+                    console.error(
+                        "Queued ICE error:",
+                        error
+                    );
+
+                }
+
+            }
+
+
+            pendingIceCandidates = [];
+
+
+            /*
+            Create answer
+            */
+
+            const answer =
+                await peerConnection.createAnswer();
+
+
+            await peerConnection.setLocalDescription(
+                answer
+            );
+
+
+            socket.emit(
+                "webrtc-answer",
+                {
+                    roomId,
+                    answer
+                }
+            );
+
+
+            console.log(
+                "WebRTC answer sent."
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                "WebRTC offer error:",
+                error
+            );
+
+
+            setStatus(
+                "Could not establish live audio."
+            );
+
+        }
+
+    }
+);
+
+
+/*
+==================================================
+ICE CANDIDATE
+==================================================
+*/
+
+socket.on(
+    "ice-candidate",
+    async ({ candidate }) => {
+
+        if (!candidate) {
+
+            return;
+
+        }
+
+
+        if (
+            !peerConnection ||
+            !peerConnection.remoteDescription
+        ) {
+
+            pendingIceCandidates.push(
+                candidate
+            );
+
+            return;
+
+        }
+
+
+        try {
+
+            await peerConnection.addIceCandidate(
+                new RTCIceCandidate(
+                    candidate
+                )
+            );
+
+        } catch (error) {
+
+            console.error(
+                "ICE error:",
+                error
+            );
+
+        }
+
+    }
+);
+
+
+/*
+==================================================
+START LISTENING
+==================================================
+*/
+
+listenBtn.addEventListener(
+    "click",
+    async () => {
+
+        console.log(
+            "START LISTENING CLICKED"
+        );
+
+
+        if (!childLive) {
+
+            setStatus(
+                "Waiting for child to start audio."
+            );
+
+            return;
+
+        }
+
+
+        if (!remoteStream) {
+
+            setStatus(
+                "Audio stream has not arrived yet."
+            );
+
+            return;
+
+        }
+
+
+        try {
+
+            /*
+            Resume Web Audio
+            */
+
+            if (!audioContext) {
+
+                await setupAudioContext();
+
+            }
+
+
+            if (
+                audioContext.state ===
+                "suspended"
+            ) {
+
+                await audioContext.resume();
+
+            }
+
+
+            /*
+            Make sure volume is on
+            */
+
+            if (gainNode) {
+
+                gainNode.gain.value =
+                    Number(
+                        volumeSlider.value
+                    );
+
+            }
+
+
+            remoteAudio.volume =
+                Number(
+                    volumeSlider.value
+                );
+
+
+            remoteAudio.muted =
+                false;
+
+
+            /*
+            Play audio element too
+            */
+
+            try {
+
+                await remoteAudio.play();
+
+            } catch (error) {
+
+                console.log(
+                    "Audio element play:",
+                    error
+                );
+
+            }
+
+
+            audioStarted =
+                true;
+
+
+            listenBtn.disabled =
+                true;
+
+            stopListenBtn.disabled =
+                false;
+
+
+            setStatus(
+                "🔊 LIVE AUDIO PLAYING",
+                true
+            );
+
+
+            console.log(
+                "AudioContext state:",
+                audioContext.state
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                "START LISTENING ERROR:",
+                error
+            );
+
+
+            setStatus(
+                "Could not start audio: " +
+                error.message
+            );
+
+        }
+
+    }
+);
+
+
+/*
+==================================================
+STOP LISTENING
+==================================================
+*/
+
+stopListenBtn.addEventListener(
+    "click",
+    () => {
+
+        console.log(
+            "STOP LISTENING"
+        );
+
+
+        audioStarted =
+            false;
+
+
+        if (audioContext) {
+
+            audioContext.suspend();
+
+        }
+
+
+        remoteAudio.pause();
+
+
+        listenBtn.disabled =
+            false;
+
+        stopListenBtn.disabled =
+            true;
+
+
+        setStatus(
+            "Audio listening stopped."
+        );
+
+    }
+);
+
+
+/*
+==================================================
+VOLUME
+==================================================
+*/
+
+volumeSlider.addEventListener(
+    "input",
+    () => {
+
+        const volume =
+            Number(
+                volumeSlider.value
+            );
+
+
+        remoteAudio.volume =
+            volume;
+
+
+        if (gainNode) {
+
+            gainNode.gain.value =
+                volume;
+
+        }
+
+    }
+);
+
+
+/*
+==================================================
+CHILD AUDIO STOPPED
+==================================================
+*/
+
+socket.on(
+    "audio-stopped",
+    () => {
+
+        childLive =
+            false;
+
+
+        audioStarted =
+            false;
+
+
+        if (audioContext) {
+
+            audioContext.suspend();
+
+        }
+
+
+        if (remoteAudio) {
+
+            remoteAudio.pause();
+
+            remoteAudio.srcObject =
+                null;
+
+        }
+
+
+        remoteStream =
+            null;
+
+
+        audioSource =
+            null;
+
+
+        gainNode =
+            null;
+
+
+        audioPanel.style.display =
+            "none";
+
+
+        listenBtn.disabled =
+            true;
+
+        stopListenBtn.disabled =
+            true;
+
+
+        setStatus(
+            "Child stopped live audio."
+        );
+
+    }
+);
+
+
+/*
+==================================================
+CHILD OFFLINE
+==================================================
+*/
+
+socket.on(
+    "child-offline",
+    () => {
+
+        childConnected =
+            false;
+
+        childLive =
+            false;
+
+        audioStarted =
+            false;
+
+
+        connectionStatus.textContent =
+            "Child: Offline";
+
+
+        if (audioContext) {
+
+            audioContext.suspend();
+
+        }
+
+
+        if (remoteAudio) {
+
+            remoteAudio.pause();
+
+            remoteAudio.srcObject =
+                null;
+
+        }
+
+
+        remoteStream =
+            null;
+
+
+        audioSource =
+            null;
+
+
+        gainNode =
+            null;
+
+
+        audioPanel.style.display =
+            "none";
+
+
+        listenBtn.disabled =
+            true;
+
+        stopListenBtn.disabled =
+            true;
+
+
+        setStatus(
+            "Child disconnected."
+        );
+
+    }
+);
+
+
+/*
+==================================================
+DISCONNECT
+==================================================
+*/
+
+disconnectBtn.addEventListener(
+    "click",
+    () => {
+
+        if (peerConnection) {
+
+            peerConnection.close();
+
+            peerConnection =
+                null;
+
+        }
+
+
+        if (audioContext) {
+
+            audioContext.close();
+
+            audioContext =
+                null;
+
+        }
+
+
+        audioSource =
+            null;
+
+        gainNode =
+            null;
+
+        remoteStream =
+            null;
+
+
+        remoteAudio.pause();
+
+        remoteAudio.srcObject =
+            null;
+
+
+        audioPanel.style.display =
+            "none";
+
+
+        socket.disconnect();
+
+
+        connected =
+            false;
+
+        childConnected =
+            false;
+
+        childLive =
+            false;
+
+        audioStarted =
+            false;
+
+
+        disconnectBtn.disabled =
+            true;
+
+
+        setStatus(
+            "Disconnected."
+        );
+
+    }
+);
+
+
+
+/*
+==================================================
+RECORDING LIST
+==================================================
+*/
+
+const recordingsList =
+    document.getElementById("recordingsList");
+
+function formatDate(value) {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "Unknown time";
+    return d.toLocaleString();
+}
+
+function formatBytes(bytes) {
+    if (!bytes) return "0 B";
+    const units = ["B", "KB", "MB", "GB"];
+    let i = 0;
+    let n = Number(bytes);
+    while (n >= 1024 && i < units.length - 1) {
+        n /= 1024;
+        i++;
+    }
+    return `${n.toFixed(i ? 1 : 0)} ${units[i]}`;
+}
+
+function formatDuration(seconds) {
+    const s = Math.max(0, Number(seconds || 0));
+    const min = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${min} min ${String(sec).padStart(2, "0")} sec`;
+}
+
+async function loadRecordings() {
+    if (!roomId) {
+        recordingsList.textContent =
+            "Enter a Child ID / Room ID first.";
+        return;
+    }
+
+    recordingsList.textContent =
+        "Loading recordings...";
+
+    try {
+        const response =
+            await fetch(
+                `/api/recordings/${encodeURIComponent(roomId)}`
+            );
+
+        const rows = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                rows.error || "Could not load recordings."
+            );
+        }
+
+        if (!rows.length) {
+            recordingsList.textContent =
+                "No recordings saved yet.";
+            return;
+        }
+
+        recordingsList.innerHTML = "";
+
+        rows.forEach(row => {
+            const item =
+                document.createElement("div");
+
+            item.className =
+                "recording-item";
+
+            const title =
+                document.createElement("div");
+
+            title.className =
+                "recording-meta";
+
+            title.innerHTML =
+                `<strong>Segment ${row.segment_number}</strong>
+                 · ${formatDate(row.started_at)}
+                 · ${formatDuration(row.duration_seconds)}
+                 · ${formatBytes(row.file_size)}`;
+
+            const audio =
+                document.createElement("audio");
+
+            audio.controls = true;
+            audio.preload = "none";
+            audio.src =
+                `/api/recordings/${row.id}/play`;
+
+            const actions =
+                document.createElement("div");
+
+            actions.className =
+                "recording-actions";
+
+            const download =
+                document.createElement("a");
+
+            download.href =
+                `/api/recordings/${row.id}/download`;
+
+            download.textContent =
+                "Download";
+
+            download.setAttribute(
+                "download",
+                ""
+            );
+
+            actions.appendChild(download);
+
+            item.appendChild(title);
+            item.appendChild(audio);
+            item.appendChild(actions);
+
+            recordingsList.appendChild(item);
+        });
+
+    } catch (error) {
+        console.error(error);
+        recordingsList.textContent =
+            "Could not load recordings.";
+    }
+}
+
+const refreshRecordings =
+    document.createElement("button");
+
+refreshRecordings.type = "button";
+refreshRecordings.className = "refresh-recordings";
+refreshRecordings.textContent = "Refresh recordings";
+
+recordingsList.parentElement.appendChild(
+    refreshRecordings
+);
+
+refreshRecordings.addEventListener(
+    "click",
+    loadRecordings
+);
+
+roomInput.addEventListener(
+    "change",
+    () => {
+        roomId = roomInput.value.trim();
+        loadRecordings();
+    }
+);
+
+socket.on(
+    "room-joined",
+    () => {
+        loadRecordings();
+    }
+);
+
+socket.on(
+    "recording-saved",
+    () => {
+        loadRecordings();
+    }
+);
+
+
+/*
+==================================================
+PAGE CLOSE
+==================================================
+*/
+
+window.addEventListener(
+    "beforeunload",
+    () => {
+
+        if (peerConnection) {
+
+            peerConnection.close();
+
+        }
+
+        if (audioContext) {
+
+            audioContext.close();
+
+        }
+
+    }
+);
+
+</script>
+
+</body>
+
+</html>

@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Child Device - Live Audio</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(circle at top,#202938,#0d1016 65%);color:#eee;font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;padding:20px}
+.container{width:100%;max-width:500px;background:#181d26;border:1px solid #303744;border-radius:20px;padding:30px;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+h1{margin:0;font-size:30px}.subtitle{color:#9098a8;margin-top:8px}
+label{display:block;margin-top:25px;margin-bottom:8px;color:#aeb6c5}
+input{width:100%;padding:14px;border-radius:10px;border:1px solid #353c49;background:#0e1218;color:white;font-size:16px;outline:none}
+button{width:100%;padding:14px;margin-top:12px;border-radius:10px;border:none;cursor:pointer;font-size:15px;font-weight:bold}
+button:disabled{opacity:.35;cursor:not-allowed}
+#connectBtn{background:#4ad9c2;color:#071310}#startBtn{background:#ff5c5c;color:white}#stopBtn{background:#292f3a;color:white}
+.status{margin-top:20px;padding:14px;background:#0e1218;border-radius:10px;color:#9ca5b5;line-height:1.5}
+.live{color:#ff5c5c!important;border:1px solid #71383d}.dot{display:inline-block;width:10px;height:10px;background:#666;border-radius:50%;margin-right:8px}.dot.live{background:#ff5c5c;animation:pulse 1s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,92,92,.7)}70%{box-shadow:0 0 0 10px rgba(255,92,92,0)}100%{box-shadow:0 0 0 0 rgba(255,92,92,0)}}
+.info{margin-top:20px;font-size:13px;color:#777f8f;line-height:1.6}
+.recording{margin-top:15px;padding:12px;background:#10141b;border-radius:10px;color:#9ca5b5}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Child Device</h1>
+<div class="subtitle">Consent-based live audio sharing</div>
+
+<label>Child ID / Room ID</label>
+<input id="roomId" value="child001" placeholder="Enter Child ID">
+
+<button id="connectBtn">Connect</button>
+<button id="startBtn" disabled>🎙 Start Live Audio & Recording</button>
+<button id="stopBtn" disabled>■ Stop Live Audio</button>
+
+<div class="status" id="status"><span class="dot"></span>Not connected</div>
+<div class="recording" id="recordingStatus">Recording is stopped.</div>
+
+<div class="info">
+The microphone is used only after you press Start Live Audio & Recording and approve the browser permission.
+<br><br>
+While sharing is active, the audio is saved in 10-minute segments. You can stop sharing at any time.
+</div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io();
+
+const roomInput = document.getElementById("roomId");
+const connectBtn = document.getElementById("connectBtn");
+const startBtn = document.getElementById("startBtn");
+const stopBtn = document.getElementById("stopBtn");
+const statusEl = document.getElementById("status");
+const recordingStatus = document.getElementById("recordingStatus");
+
+let roomId = null;
+let localStream = null;
+let peerConnection = null;
+let connected = false;
+
+let mediaRecorder = null;
+let recordingTimer = null;
+let recordingChunks = [];
+let recordingStartedAt = null;
+let segmentNumber = 0;
+let stopping = false;
+
+function setStatus(message, live=false) {
+    statusEl.innerHTML =
+        `<span class="dot ${live ? "live" : ""}"></span>${message}`;
+    statusEl.classList.toggle("live", live);
+}
+
+function chooseMimeType() {
+    const choices = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/ogg;codecs=opus"
+    ];
+    return choices.find(type => MediaRecorder.isTypeSupported(type)) || "";
+}
+
+connectBtn.addEventListener("click", () => {
+    roomId = roomInput.value.trim();
+
+    if (!roomId) {
+        alert("Enter Child ID / Room ID");
+        return;
+    }
+
+    socket.emit("join-room", {
+        roomId,
+        role: "child"
+    });
+
+    connectBtn.disabled = true;
+    roomInput.disabled = true;
+    setStatus("Connecting...");
+});
+
+socket.on("room-joined", () => {
+    connected = true;
+    startBtn.disabled = false;
+    setStatus("Connected. You can start sharing.");
+});
+
+socket.on("child-online", () => {
+    setStatus("Connected.");
+});
+
+socket.on("webrtc-answer", async ({ answer }) => {
+    if (!peerConnection) return;
+    try {
+        await peerConnection.setRemoteDescription(
+            new RTCSessionDescription(answer)
+        );
+    } catch (error) {
+        console.error("Answer error:", error);
+    }
+});
+
+socket.on("ice-candidate", async ({ candidate }) => {
+    if (!candidate) return;
+
+    if (!peerConnection || !peerConnection.remoteDescription) {
+        return;
+    }
+
+    try {
+        await peerConnection.addIceCandidate(
+            new RTCIceCandidate(candidate)
+        );
+    } catch (error) {
+        console.error("ICE error:", error);
+    }
+});
+
+async function createPeerConnection() {
+    if (peerConnection) peerConnection.close();
+
+    peerConnection = new RTCPeerConnection({
+        iceServers: [
+            { urls: "stun:stun.l.google.com:19302" }
+        ]
+    });
+
+    localStream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, localStream);
+    });
+
+    peerConnection.onicecandidate = event => {
+        if (!event.candidate) return;
+
+        socket.emit("ice-candidate", {
+            roomId,
+            candidate: event.candidate
+        });
+    };
+
+    peerConnection.onconnectionstatechange = () => {
+        console.log(
+            "Child WebRTC state:",
+            peerConnection.connectionState
+        );
+    };
+
+    const offer = await peerConnection.createOffer({
+        offerToReceiveAudio: false
+    });
+
+    await peerConnection.setLocalDescription(offer);
+
+    socket.emit("webrtc-offer", {
+        roomId,
+        offer
+    });
+}
+
+async function startRecordingSegment() {
+    if (!localStream || !localStream.getAudioTracks().length) {
+        return;
+    }
+
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        return;
+    }
+
+    const mimeType = chooseMimeType();
+
+    try {
+        mediaRecorder = mimeType
+            ? new MediaRecorder(localStream, { mimeType })
+            : new MediaRecorder(localStream);
+    } catch (error) {
+        console.error("MediaRecorder error:", error);
+        recordingStatus.textContent =
+            "Recording is not supported by this browser.";
+        return;
+    }
+
+    recordingChunks = [];
+    recordingStartedAt = new Date();
+    segmentNumber += 1;
+
+    mediaRecorder.ondataavailable = event => {
+        if (event.data && event.data.size > 0) {
+            recordingChunks.push(event.data);
+        }
+    };
+
+    mediaRecorder.onerror = event => {
+        console.error("Recorder error:", event.error);
+        recordingStatus.textContent =
+            "Recording error occurred.";
+    };
+
+    mediaRecorder.onstop = async () => {
+        const endedAt = new Date();
+
+        const blobType =
+            mediaRecorder.mimeType || "audio/webm";
+
+        const blob = new Blob(
+            recordingChunks,
+            { type: blobType }
+        );
+
+        const currentSegment = segmentNumber;
+        const currentStart = recordingStartedAt;
+
+        recordingChunks = [];
+
+        if (blob.size > 0) {
+            await uploadRecording(
+                blob,
+                currentSegment,
+                currentStart,
+                endedAt
+            );
+        }
+
+        if (!stopping && localStream) {
+            await startRecordingSegment();
+        }
+    };
+
+    mediaRecorder.start();
+
+    recordingStatus.textContent =
+        `Recording segment ${segmentNumber} — next segment in 10 minutes.`;
+
+    recordingTimer = setTimeout(() => {
+        if (
+            mediaRecorder &&
+            mediaRecorder.state === "recording"
+        ) {
+            mediaRecorder.stop();
+        }
+    }, 10 * 60 * 1000);
+}
+
+async function uploadRecording(
+    blob,
+    currentSegment,
+    startedAt,
+    endedAt
+) {
+    recordingStatus.textContent =
+        `Uploading segment ${currentSegment}...`;
+
+    const formData = new FormData();
+
+    const extension =
+        blob.type.includes("ogg") ? "ogg" : "webm";
+
+    formData.append(
+        "audio",
+        blob,
+        `child-${roomId}-segment-${currentSegment}.${extension}`
+    );
+
+    formData.append("roomId", roomId);
+    formData.append(
+        "segmentNumber",
+        String(currentSegment)
+    );
+    formData.append(
+        "startedAt",
+        startedAt.toISOString()
+    );
+    formData.append(
+        "endedAt",
+        endedAt.toISOString()
+    );
+
+    try {
+        const response = await fetch(
+            "/api/recordings",
+            {
+                method: "POST",
+                body: formData
+            }
+        );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                result.error || "Upload failed."
+            );
+        }
+
+        recordingStatus.textContent =
+            `Segment ${currentSegment} saved.`;
+
+        socket.emit("recording-saved", {
+            roomId,
+            segmentNumber: currentSegment
+        });
+    } catch (error) {
+        console.error("Recording upload failed:", error);
+
+        recordingStatus.textContent =
+            `Segment ${currentSegment} could not be saved.`;
+    }
+}
+
+async function stopRecording() {
+    stopping = true;
+
+    if (recordingTimer) {
+        clearTimeout(recordingTimer);
+        recordingTimer = null;
+    }
+
+    if (
+        mediaRecorder &&
+        mediaRecorder.state !== "inactive"
+    ) {
+        mediaRecorder.stop();
+    } else {
+        recordingStatus.textContent =
+            "Recording is stopped.";
+    }
+}
+
+startBtn.addEventListener("click", async () => {
+    if (!connected) {
+        setStatus("Connect first.");
+        return;
+    }
+
+    try {
+        setStatus("Requesting microphone permission...");
+
+        localStream =
+            await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                },
+                video: false
+            });
+
+        stopping = false;
+
+        await createPeerConnection();
+
+        socket.emit("audio-started", { roomId });
+
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+
+        setStatus(
+            "LIVE AUDIO SHARING",
+            true
+        );
+
+        await startRecordingSegment();
+    } catch (error) {
+        console.error("MICROPHONE ERROR:", error.name, error.message);
+
+        if (error.name === "NotFoundError") {
+            setStatus(
+                "No microphone detected. Check Windows Sound settings."
+            );
+        } else if (error.name === "NotAllowedError") {
+            setStatus(
+                "Microphone permission was denied."
+            );
+        } else {
+            setStatus(
+                `${error.name}: ${error.message}`
+            );
+        }
+    }
+});
+
+stopBtn.addEventListener("click", async () => {
+    await stopRecording();
+
+    if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+    }
+
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+    }
+
+    socket.emit("audio-stopped", { roomId });
+
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+
+    setStatus("Live audio stopped.");
+});
+
+socket.on("disconnect", () => {
+    if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localStream = null;
+    }
+});
+</script>
+</body>
+</html>

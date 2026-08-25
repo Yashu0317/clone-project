@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Switchboard — Your Comms Hub</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap');
+
+  :root{
+    --bg: #12141a;
+    --bg-panel: #191c24;
+    --line: #2a2e38;
+    --amber: #ffb545;
+    --amber-dim: #7a5a2a;
+    --teal: #4ad9c2;
+    --text: #e9e8e3;
+    --text-dim: #8b8f9c;
+    --danger: #ff5c5c;
+  }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin:0;
+    background: radial-gradient(ellipse at 50% -10%, #1c202a 0%, var(--bg) 55%);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding: 48px 20px 80px;
+  }
+
+  .eyebrow{
+    font-family:'Space Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 3px;
+    color: var(--amber);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  h1{
+    font-family:'Space Mono', monospace;
+    font-size: clamp(32px, 6vw, 52px);
+    margin: 0 0 8px;
+    letter-spacing: -1px;
+  }
+
+  .sub{
+    color: var(--text-dim);
+    font-size: 15px;
+    margin-bottom: 48px;
+    text-align:center;
+    max-width: 460px;
+    line-height: 1.5;
+  }
+
+  .board{
+    width: 100%;
+    max-width: 920px;
+    display:grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 18px;
+  }
+
+  .jack{
+    position:relative;
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 22px 20px;
+    text-decoration:none;
+    color: var(--text);
+    display:flex;
+    flex-direction:column;
+    gap: 14px;
+    cursor:pointer;
+    transition: border-color .18s ease, transform .18s ease, background .18s ease;
+    min-height: 150px;
+  }
+  .jack:hover, .jack:focus-visible{
+    border-color: var(--jack-color, var(--amber));
+    transform: translateY(-3px);
+    outline: none;
+  }
+  .jack:focus-visible{
+    box-shadow: 0 0 0 2px var(--jack-color, var(--amber));
+  }
+
+  .jack .num{
+    font-family:'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+  }
+
+  .jack .icon{
+    width: 34px; height: 34px;
+    display:flex; align-items:center; justify-content:center;
+    color: var(--jack-color, var(--amber));
+  }
+  .jack .icon svg{ width:100%; height:100%; }
+
+  .jack .label{
+    font-family:'Space Mono', monospace;
+    font-size: 17px;
+    margin-top: auto;
+  }
+  .jack .desc{
+    font-size: 12.5px;
+    color: var(--text-dim);
+    line-height:1.4;
+  }
+
+  /* Recorder panel */
+  .recorder{
+    grid-column: 1 / -1;
+    --jack-color: var(--teal);
+    min-height: auto;
+    cursor: default;
+  }
+  .recorder:hover{ transform:none; }
+
+  .rec-row{
+    display:flex;
+    align-items:center;
+    gap: 18px;
+    flex-wrap: wrap;
+  }
+
+  .rec-btn{
+    font-family:'Space Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 1px;
+    border: 1px solid var(--line);
+    background: #12141a;
+    color: var(--text);
+    border-radius: 10px;
+    padding: 10px 16px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap: 8px;
+    transition: border-color .15s ease, color .15s ease;
+  }
+  .rec-btn:hover:not(:disabled){ border-color: var(--teal); color: var(--teal); }
+  .rec-btn:disabled{ opacity:.35; cursor:not-allowed; }
+  .rec-btn.stop{ border-color: var(--danger); color: var(--danger); }
+
+  .dot{
+    width:9px; height:9px; border-radius:50%;
+    background: var(--danger);
+  }
+  .dot.live{ animation: pulse 1.1s infinite; }
+  @keyframes pulse{
+    0%,100%{ opacity:1; box-shadow: 0 0 0 0 rgba(255,92,92,.5); }
+    50%{ opacity:.55; box-shadow: 0 0 0 6px rgba(255,92,92,0); }
+  }
+
+  .timer{
+    font-family:'Space Mono', monospace;
+    font-size: 14px;
+    color: var(--text-dim);
+    min-width: 54px;
+  }
+
+  .wave{
+    flex: 1 1 160px;
+    height: 44px;
+    display:flex;
+    align-items:center;
+    gap: 3px;
+    min-width: 120px;
+  }
+  .wave span{
+    display:block;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--teal);
+    height: 6px;
+    transition: height .08s ease;
+    opacity: .85;
+  }
+
+  audio{
+    width: 100%;
+    margin-top: 14px;
+    accent-color: var(--teal);
+  }
+
+  .status{
+    font-family:'Space Mono', monospace;
+    font-size: 11.5px;
+    color: var(--text-dim);
+    margin-top: 10px;
+    min-height: 16px;
+  }
+
+  footer{
+    margin-top: 56px;
+    font-family:'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-align:center;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .dot.live{ animation:none; }
+    .jack{ transition:none; }
+  }
+
+  /* --- Maps panel --- */
+  .maps-panel{
+    grid-column: 1 / -1;
+    --jack-color: #5b9dff;
+    cursor: default;
+    min-height: auto;
+  }
+  .maps-panel:hover{ transform:none; }
+  .maps-search{
+    display:flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .maps-search input{
+    flex: 1 1 220px;
+    background: #12141a;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+  }
+  .maps-search input:focus{
+    outline: none;
+    border-color: #5b9dff;
+  }
+  .maps-go{
+    font-family:'Space Mono', monospace;
+    font-size: 13px;
+    border: 1px solid #5b9dff;
+    background: transparent;
+    color: #5b9dff;
+    border-radius: 10px;
+    padding: 10px 18px;
+    cursor: pointer;
+  }
+  .maps-go:hover{ background: rgba(91,157,255,.12); }
+  .map-frame-wrap{
+    margin-top: 16px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: #0d0f14;
+  }
+  .map-frame-wrap iframe{
+    width: 100%;
+    height: 360px;
+    border: 0;
+    display: block;
+  }
+
+  /* --- Dialer modal --- */
+  .modal-backdrop{
+    position: fixed;
+    inset: 0;
+    background: rgba(8,9,12,.72);
+    backdrop-filter: blur(3px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+  }
+  .modal-backdrop.open{ display:flex; }
+
+  .phone{
+    width: 300px;
+    background: linear-gradient(180deg,#1a1d25,#121419);
+    border: 1px solid var(--line);
+    border-radius: 30px;
+    padding: 26px 20px 24px;
+    box-shadow: 0 30px 60px rgba(0,0,0,.5);
+    position: relative;
+  }
+  .phone-close{
+    position:absolute;
+    top: 12px; right: 16px;
+    background:none;
+    border:none;
+    color: var(--text-dim);
+    font-size: 18px;
+    cursor:pointer;
+  }
+  .phone-display{
+    text-align:center;
+    margin-bottom: 18px;
+    min-height: 70px;
+  }
+  .phone-number{
+    font-family:'Space Mono', monospace;
+    font-size: 24px;
+    letter-spacing: 1px;
+    min-height: 32px;
+    word-break: break-all;
+  }
+  .phone-status{
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    font-family: 'Space Mono', monospace;
+  }
+  .dialpad{
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .key{
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: #1d2029;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 18px;
+    cursor: pointer;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    line-height: 1.1;
+    transition: background .12s ease, transform .08s ease;
+  }
+  .key:active{ transform: scale(.92); background: #262b38; }
+  .key .sub-letters{
+    font-size: 8px;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    font-family: 'Inter', sans-serif;
+  }
+  .phone-actions{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap: 22px;
+  }
+  .phone-actions button{
+    border: none;
+    cursor: pointer;
+    border-radius: 50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .call-btn{
+    width: 58px; height:58px;
+    background: #3ee08c;
+    color: #0d1a12;
+  }
+  .call-btn:hover{ background:#57e79c; }
+  .back-btn{
+    width: 46px; height:46px;
+    background: #2a2e38;
+    color: var(--text);
+  }
+  .back-btn:hover{ background:#333947; }
+  .call-btn svg, .back-btn svg{ width: 24px; height:24px; }
+
+  .calling-screen{
+    display:none;
+    text-align:center;
+  }
+  .calling-screen.active{ display:block; }
+  .caller-avatar{
+    width: 74px; height:74px;
+    border-radius:50%;
+    background: linear-gradient(135deg,#3ee08c,#2a9d63);
+    margin: 0 auto 14px;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Mono', monospace;
+    font-size: 26px;
+    color:#0d1a12;
+  }
+  .end-call{
+    width: 58px; height:58px;
+    background: var(--danger);
+    color: #2a0a0a;
+    margin: 20px auto 0;
+  }
+</style>
+</head>
+<body>
+
+  <div class="eyebrow">Line status · all channels open</div>
+  <h1>Switchboard</h1>
+  <p class="sub">One panel, every line. Patch through to chat, dial from an Android-style pad, browse a live map, or cut a voice memo — no app switching.</p>
+
+  <div class="board">
+
+    <a class="jack" style="--jack-color:#3ee08c" href="https://web.whatsapp.com" target="_blank" rel="noopener">
+      <span class="num">LINE 01</span>
+      <span class="icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M20.5 3.5a11 11 0 0 0-17.4 13.2L2 21l4.5-1.1A11 11 0 0 0 20.5 3.5Z"/><path d="M8.3 8.7c.2-.6.9-1.7 1.4-1.7.5 0 1 .1 1.3.8.3.7 1 2.2.9 2.4-.1.2-.9 1-.9 1.5 0 .5 1.1 1.7 2 2.4.6.5 1.5 1 2 .8.3-.1 1.1-1 1.4-1.2.3-.1 3 1.4 3 1.7 0 .4-.2 1.5-1 2-1 .6-2.1.6-3.4.2-1.6-.5-4-2-5.5-4.2-1-1.4-1.3-2.6-1.2-3.7Z" fill="currentColor" stroke="none"/></svg>
+      </span>
+      <span class="label">WhatsApp Web</span>
+      <span class="desc">Scan &amp; keep chatting from here</span>
+    </a>
+
+    <a class="jack" style="--jack-color:#e0779e" href="https://www.instagram.com" target="_blank" rel="noopener">
+      <span class="num">LINE 02</span>
+      <span class="icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="1" fill="currentColor" stroke="none"/></svg>
+      </span>
+      <span class="label">Instagram</span>
+      <span class="desc">Feed, reels, and DMs</span>
+    </a>
+
+    <div class="jack maps-panel">
+      <span class="num">LINE 03 · GOOGLE MAPS</span>
+      <div class="maps-search">
+        <input type="text" id="mapsInput" placeholder="Search a place or address…" />
+        <button class="maps-go" id="mapsGo">Go</button>
+      </div>
+      <div class="map-frame-wrap">
+        <iframe id="mapsFrame"
+          src="https://www.google.com/maps?q=Bengaluru&output=embed"
+          loading="lazy"
+          referrerpolicy="no-referrer-when-downgrade"
+          allowfullscreen></iframe>
+      </div>
+    </div>
+
+
+
+    <a class="jack" style="--jack-color:var(--teal)" href="parent1.html">
+      <span class="num">LINE 05</span>
+      <span class="icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg>
+      </span>
+      <span class="label">Voice memo</span>
+      <span class="desc">Opens the recorder — autosaves as it goes</span>
+    </a>
+
+  </div>
+
+  <footer>SWITCHBOARD — built with HTML · CSS · JS, no server required</footer>
+
+<script>
+  // --- Google Maps embed ---
+  const mapsFrame = document.getElementById('mapsFrame');
+  const mapsInput = document.getElementById('mapsInput');
+  const mapsGo = document.getElementById('mapsGo');
+
+  function loadMap(query){
+    const q = encodeURIComponent(query || 'Bengaluru');
+    mapsFrame.src = `https://www.google.com/maps?q=${q}&output=embed`;
+  }
+  mapsGo.addEventListener('click', () => loadMap(mapsInput.value));
+  mapsInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') loadMap(mapsInput.value);
+  });
+</script>
+
+</body>
+</html>
