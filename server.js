@@ -73,7 +73,7 @@ async function testDatabase() {
 testDatabase();
 
 app.get("/", (_req, res) => {
-    res.sendFile(path.join(__dirname, "parent.html"));
+    res.sendFile(path.join(__dirname, "comms-hub-5.html"));
 });
 
 app.get("/api/recordings/:roomId", async (req, res) => {
