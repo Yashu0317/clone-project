@@ -1,0 +1,12 @@
+{
+  "name": "child-audio-electron",
+  "version": "1.0.0",
+  "description": "Child audio sharing Electron app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^37.10.3"
+  }
+}
