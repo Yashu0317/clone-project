@@ -19,6 +19,7 @@ button:disabled{opacity:.35;cursor:not-allowed}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,92,92,.7)}70%{box-shadow:0 0 0 10px rgba(255,92,92,0)}100%{box-shadow:0 0 0 0 rgba(255,92,92,0)}}
 .info{margin-top:20px;font-size:13px;color:#777f8f;line-height:1.6}
 .recording{margin-top:15px;padding:12px;background:#10141b;border-radius:10px;color:#9ca5b5}
+.banner{margin-top:12px;padding:12px;background:#241a13;border:1px solid #6b4a26;border-radius:10px;color:#e0b177;font-size:13px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -35,11 +36,14 @@ button:disabled{opacity:.35;cursor:not-allowed}
 
 <div class="status" id="status"><span class="dot"></span>Not connected</div>
 <div class="recording" id="recordingStatus">Recording is stopped.</div>
+<div class="banner" id="bgBanner" style="display:none;"></div>
 
 <div class="info">
 The microphone is used only after you press Start Live Audio & Recording and approve the browser permission.
 <br><br>
 While sharing is active, the audio is saved in 10-minute segments. You can stop sharing at any time.
+<br><br>
+While this is active, this device shows a persistent notification/media indicator on the phone so it's visible that audio is being shared — this is intentional and is not disabled by this app.
 </div>
 </div>
 
@@ -53,6 +57,7 @@ const startBtn = document.getElementById("startBtn");
 const stopBtn = document.getElementById("stopBtn");
 const statusEl = document.getElementById("status");
 const recordingStatus = document.getElementById("recordingStatus");
+const bgBanner = document.getElementById("bgBanner");
 
 let roomId = null;
 let localStream = null;
@@ -66,10 +71,18 @@ let recordingStartedAt = null;
 let segmentNumber = 0;
 let stopping = false;
 
+let wakeLock = null;
+let sharingActive = false;
+
 function setStatus(message, live=false) {
     statusEl.innerHTML =
         `<span class="dot ${live ? "live" : ""}"></span>${message}`;
     statusEl.classList.toggle("live", live);
+}
+
+function showBanner(message) {
+    bgBanner.style.display = message ? "block" : "none";
+    bgBanner.textContent = message || "";
 }
 
 function chooseMimeType() {
@@ -79,6 +92,80 @@ function chooseMimeType() {
         "audio/ogg;codecs=opus"
     ];
     return choices.find(type => MediaRecorder.isTypeSupported(type)) || "";
+}
+
+/* ---------------- Wake Lock: keeps screen awake while sharing.
+   Does NOT survive the phone being locked or the app switched away
+   entirely -- that's an OS-level restriction Wake Lock can't override. ---------------- */
+async function requestWakeLock() {
+    if (!("wakeLock" in navigator)) return;
+    try {
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", () => {
+            console.log("Wake lock released");
+        });
+    } catch (err) {
+        console.warn("Wake lock request failed:", err.name, err.message);
+    }
+}
+
+function releaseWakeLock() {
+    if (wakeLock) {
+        wakeLock.release().catch(() => {});
+        wakeLock = null;
+    }
+}
+
+// Re-acquire wake lock whenever the tab becomes visible again,
+// since the OS releases it automatically on backgrounding.
+document.addEventListener("visibilitychange", async () => {
+    if (document.visibilityState === "visible" && sharingActive) {
+        await requestWakeLock();
+        showBanner("");
+    } else if (document.visibilityState === "hidden" && sharingActive) {
+        // Being upfront: once hidden, Chrome may throttle or freeze this tab.
+        // Media Session (below) helps Chrome keep it active longer, but this
+        // isn't guaranteed indefinitely on all devices.
+        showBanner(
+            "Tab is backgrounded. Sharing may pause if the OS freezes this tab. " +
+            "Keep this screen open and unlocked for the most reliable connection."
+        );
+    }
+});
+
+/* ---------------- Media Session: marks this as active playing media.
+   This is what typically produces a persistent system notification/media
+   control on Android while sharing is live, and also makes Chrome less
+   likely to aggressively suspend the tab. It is intentionally visible --
+   that's what makes it a legitimate background-friendly mechanism rather
+   than a covert one. ---------------- */
+function setMediaSessionActive(roomLabel) {
+    if (!("mediaSession" in navigator)) return;
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+        title: "Live audio sharing active",
+        artist: `Room: ${roomLabel}`,
+        album: "Child Device"
+    });
+    navigator.mediaSession.playbackState = "playing";
+
+    // Stop action lets the notification double as a stop control.
+    try {
+        navigator.mediaSession.setActionHandler("pause", () => {
+            stopBtn.click();
+        });
+        navigator.mediaSession.setActionHandler("stop", () => {
+            stopBtn.click();
+        });
+    } catch (e) {
+        // Some browsers don't support all action handlers; safe to ignore.
+    }
+}
+
+function clearMediaSession() {
+    if (!("mediaSession" in navigator)) return;
+    navigator.mediaSession.playbackState = "none";
+    navigator.mediaSession.metadata = null;
 }
 
 connectBtn.addEventListener("click", () => {
@@ -163,6 +250,14 @@ async function createPeerConnection() {
             "Child WebRTC state:",
             peerConnection.connectionState
         );
+
+        if (
+            sharingActive &&
+            (peerConnection.connectionState === "disconnected" ||
+             peerConnection.connectionState === "failed")
+        ) {
+            setStatus("Connection lost. Try reconnecting.");
+        }
     };
 
     const offer = await peerConnection.createOffer({
@@ -365,8 +460,11 @@ startBtn.addEventListener("click", async () => {
             });
 
         stopping = false;
+        sharingActive = true;
 
         await createPeerConnection();
+        await requestWakeLock();
+        setMediaSessionActive(roomId);
 
         socket.emit("audio-started", { roomId });
 
@@ -376,6 +474,10 @@ startBtn.addEventListener("click", async () => {
         setStatus(
             "LIVE AUDIO SHARING",
             true
+        );
+
+        showBanner(
+            "A persistent notification will stay visible on this device while sharing is active."
         );
 
         await startRecordingSegment();
@@ -399,6 +501,8 @@ startBtn.addEventListener("click", async () => {
 });
 
 stopBtn.addEventListener("click", async () => {
+    sharingActive = false;
+
     await stopRecording();
 
     if (peerConnection) {
@@ -410,6 +514,10 @@ stopBtn.addEventListener("click", async () => {
         localStream.getTracks().forEach(track => track.stop());
         localStream = null;
     }
+
+    releaseWakeLock();
+    clearMediaSession();
+    showBanner("");
 
     socket.emit("audio-stopped", { roomId });
 
@@ -424,6 +532,9 @@ socket.on("disconnect", () => {
         localStream.getTracks().forEach(track => track.stop());
         localStream = null;
     }
+    sharingActive = false;
+    releaseWakeLock();
+    clearMediaSession();
 });
 </script>
 </body>
